@@ -29,7 +29,7 @@ java {
 tasks.withType<KotlinCompile> {
 	compilerOptions {
 		jvmTarget.set(JvmTarget.JVM_17)
-		freeCompilerArgs.set(listOf("-Xvalue-classes"))
+		freeCompilerArgs.set(listOf("-Xdebug", "-Xvalue-classes", "-Xno-optimize"))
 	}
 }
 
@@ -42,6 +42,9 @@ tasks.withType<Test> {
 }
 tasks.withType<Javadoc> {
 	options.encoding = "UTF-8"
+}
+tasks.withType<JavaCompile> {
+	options.compilerArgs.add("-g")
 }
 
 allprojects {
@@ -71,7 +74,7 @@ tasks.shadowJar {
 	minimize {
 		exclude(dependency("com.fazecast:jSerialComm:.*"))
 		exclude(dependency("net.java.dev.jna:.*:.*"))
-		exclude(dependency("com.google.flatbuffers:flatbuffers-java:.*"))
+		// exclude(dependency("com.google.flatbuffers:flatbuffers-java:.*"))
 
 		exclude(project(":solarxr-protocol"))
 	}

@@ -1,3 +1,7 @@
+tasks.withType<JavaCompile> {
+	options.compilerArgs.add("-g")
+}
+
 plugins {
 	id("com.diffplug.spotless")
 }
