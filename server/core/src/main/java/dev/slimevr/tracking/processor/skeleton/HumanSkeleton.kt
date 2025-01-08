@@ -1104,8 +1104,12 @@ class HumanSkeleton(
 
 	private fun updateComputedTracker(computedTracker: Tracker?, trackerBone: Bone) {
 		computedTracker?.let {
-			it.position = trackerBone.getTailPosition()
-			it.setRotation(trackerBone.getGlobalRotation() * trackerBone.rotationOffset.inv())
+			if (headTracker != null) {
+				// Use values set by generated pose data.
+				// Match the rotation to the HMD device coordinates.
+				it.position = it.received_position + headTracker!!.position
+				it.setRotation(headTracker!!.getRotation() * it.received_rotation)
+			}
 			it.dataTick()
 		}
 	}

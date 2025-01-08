@@ -89,6 +89,7 @@ data class UDPPacket1Rotation(override var rotation: Quaternion = Quaternion.IDE
 	override val sensorId = 0
 	override fun readData(buf: ByteBuffer) {
 		rotation = UDPUtils.getSafeBufferQuaternion(buf)
+		// LogManager.info("Rotation received: $rotation (from Sensor ID $sensorId)")
 	}
 }
 
@@ -274,6 +275,7 @@ data class UDPPacket17RotationData(
 		dataType = buf.get().toInt() and 0xFF
 		rotation = UDPUtils.getSafeBufferQuaternion(buf)
 		calibrationInfo = buf.get().toInt() and 0xFF
+		// LogManager.info("Rotation received: $rotation (from Sensor ID $sensorId)")
 	}
 
 	companion object {
@@ -406,6 +408,27 @@ data class UDPPacket200ProtocolChange(
 	override fun writeData(buf: ByteBuffer) {
 		buf.put(targetProtocol.toByte())
 		buf.put(targetProtocolVersion.toByte())
+	}
+}
+
+data class UDPPacket300GeneratedMotionData(
+	override var rotation: Quaternion = Quaternion.IDENTITY,
+	var position: Vector3 = Vector3.NULL,
+) : UDPPacket(300),
+	RotationPacket {
+	override var sensorId: Int = 0
+	override fun readData(buf: ByteBuffer) {
+		// s16 s16 s16 s16 s16 s16 s16
+		// qW  qX  qY  qZ  pX  pY  pZ
+		sensorId = buf.int
+		val scaleR = 1 / (1 shl 15).toFloat() // Q15: 1 is represented as 0x7FFF and -1 as 0x8000
+		val w = buf.short * scaleR
+		val x = buf.short * scaleR
+		val y = buf.short * scaleR
+		val z = buf.short * scaleR
+		rotation = Quaternion(w, x, y, z).unit()
+		val scaleA = 1 / (1 shl 7).toFloat() // The same as the HID scale
+		position = Vector3(buf.short * scaleA, buf.short * scaleA, buf.short * scaleA)
 	}
 }
 

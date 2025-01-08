@@ -133,6 +133,7 @@ class VRServer @JvmOverloads constructor(
 		trackersServer = TrackersUDPServer(
 			trackerPort,
 			"Sensors UDP server",
+			computedTrackers,
 		) { tracker: Tracker -> registerTracker(tracker) }
 
 		// Start bridges for SteamVR and Feeder

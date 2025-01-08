@@ -11,6 +11,7 @@ import dev.slimevr.util.ann.VRServerThread
 import io.eiren.util.ann.Synchronize
 import io.eiren.util.ann.ThreadSafe
 import io.eiren.util.collections.FastList
+import io.eiren.util.logging.LogManager
 import io.github.axisangles.ktmath.Quaternion
 import io.github.axisangles.ktmath.Vector3
 import java.util.Queue
@@ -115,6 +116,10 @@ abstract class ProtobufBridge(@JvmField protected val bridgeName: String) : ISte
 			builder.setQz(rot.z)
 			builder.setQw(rot.w)
 		}
+
+		LogManager.log.info("Tracker location: " + localTracker.trackerPosition?.trackerRole)
+		LogManager.log.info("Sent pos: " + localTracker.position)
+		LogManager.log.info("Sent rot: " + localTracker.getRotation())
 		sendMessage(ProtobufMessage.newBuilder().setPosition(builder).build())
 	}
 
