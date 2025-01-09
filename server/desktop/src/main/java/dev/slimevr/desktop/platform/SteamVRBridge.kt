@@ -112,6 +112,21 @@ abstract class SteamVRBridge(
 
 		// Hands aren't touched as they will override the controller's tracking
 		// Return true to say that trackers were successfully toggled automatically
+
+		// Comment (250106, Sangeun):
+		// Change head position and hand positions to use generated pose data.
+
+		changeShareSettings(TrackerRole.WAIST, true)
+		changeShareSettings(TrackerRole.CHEST, true)
+		changeShareSettings(TrackerRole.LEFT_FOOT, true)
+		changeShareSettings(TrackerRole.RIGHT_FOOT, true)
+		changeShareSettings(TrackerRole.LEFT_KNEE, true)
+		changeShareSettings(TrackerRole.RIGHT_KNEE, true)
+		changeShareSettings(TrackerRole.LEFT_ELBOW, true)
+		changeShareSettings(TrackerRole.RIGHT_ELBOW, true)
+		changeShareSettings(TrackerRole.LEFT_HAND, true)
+		changeShareSettings(TrackerRole.RIGHT_HAND, true)
+
 		return true
 	}
 

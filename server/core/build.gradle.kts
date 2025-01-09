@@ -28,7 +28,7 @@ java {
 tasks.withType<KotlinCompile> {
 	compilerOptions {
 		jvmTarget.set(JvmTarget.JVM_17)
-		freeCompilerArgs.set(listOf("-Xvalue-classes"))
+		freeCompilerArgs.set(listOf("-Xdebug", "-Xvalue-classes", "-Xno-optimize"))
 	}
 }
 
@@ -42,7 +42,9 @@ tasks.withType<Test> {
 tasks.withType<Javadoc> {
 	options.encoding = "UTF-8"
 }
-
+tasks.withType<JavaCompile> {
+	options.compilerArgs.add("-g")
+}
 tasks.withType<Jar> {
 	from("../../LICENSE-APACHE")
 	from("../../LICENSE-MIT")

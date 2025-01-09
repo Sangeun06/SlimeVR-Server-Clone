@@ -3,6 +3,7 @@ package dev.slimevr.tracking.trackers.udp
 import com.jme3.math.FastMath
 import dev.slimevr.NetworkProtocol
 import dev.slimevr.VRServer
+import dev.slimevr.VRServer.Companion.getNextLocalTrackerId
 import dev.slimevr.config.config
 import dev.slimevr.protocol.rpc.MAG_TIMEOUT
 import dev.slimevr.tracking.trackers.*
@@ -14,10 +15,13 @@ import io.github.axisangles.ktmath.Vector3
 import kotlinx.coroutines.*
 import org.apache.commons.lang3.ArrayUtils
 import solarxr_protocol.rpc.ResetType
+import java.io.OutputStream
+import java.io.PrintWriter
 import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.InetSocketAddress
 import java.net.NetworkInterface
+import java.net.Socket
 import java.net.SocketAddress
 import java.net.SocketTimeoutException
 import java.nio.ByteBuffer
@@ -32,7 +36,7 @@ import kotlin.coroutines.resume
 /**
  * Receives trackers data by UDP using extended owoTrack protocol.
  */
-class TrackersUDPServer(private val port: Int, name: String, private val trackersConsumer: Consumer<Tracker>) : Thread(name) {
+class TrackersUDPServer(private val port: Int, name: String, private val computedTrackers: MutableList<Tracker>, private val trackersConsumer: Consumer<Tracker>) : Thread(name) {
 	private val random = Random()
 	private val connections: MutableList<UDPDevice> = FastList()
 	private val connectionsByAddress: MutableMap<SocketAddress, UDPDevice> = HashMap()
@@ -53,6 +57,9 @@ class TrackersUDPServer(private val port: Int, name: String, private val tracker
 	}
 	private val parser = UDPProtocolParser()
 
+	// Test for TransPose
+	private val streaming_socket = Socket("127.0.0.1", 8889)
+
 	// 1500 is a common network MTU. 1472 is the maximum size of a UDP packet (1500 - 20 for IPv4 header - 8 for UDP header)
 	private val rcvBuffer = ByteArray(1500 - 20 - 8)
 	private val bb = ByteBuffer.wrap(rcvBuffer).order(ByteOrder.BIG_ENDIAN)
@@ -60,6 +67,29 @@ class TrackersUDPServer(private val port: Int, name: String, private val tracker
 	// Gets initialized in this.run()
 	private lateinit var socket: DatagramSocket
 	private var lastKeepup = System.currentTimeMillis()
+
+	fun getComputedTracker(id: Int): Tracker? {
+		/*
+			Tracker ID:
+				TrackerPosition.HEAD: 1
+				TrackerPosition.UPPER_CHEST: 3
+				TrackerPosition.HIP: 6
+				TrackerPosition.LEFT_UPPER_LEG: 7
+				TrackerPosition.RIGHT_UPPER_LEG: 8
+				TrackerPosition.LEFT_FOOT: 11
+				TrackerPosition.RIGHT_FOOT: 12
+				TrackerPosition.LEFT_UPPER_ARM: 15
+				TrackerPosition.RIGHT_UPPER_ARM: 16
+				TrackerPosition.LEFT_HAND: 17
+				TrackerPosition.RIGHT_HAND: 18
+		 */
+		for (t in computedTrackers) {
+			if (t.trackerPosition?.id == id) {
+				return t
+			}
+		}
+		return null
+	}
 
 	private fun setUpNewConnection(handshakePacket: DatagramPacket, handshake: UDPPacket3Handshake) {
 		LogManager.info("[TrackerServer] Handshake received from ${handshakePacket.address}:${handshakePacket.port}")
@@ -388,12 +418,24 @@ class TrackersUDPServer(private val port: Int, name: String, private val tracker
 			is RotationPacket -> {
 				var rot = packet.rotation
 				rot = AXES_OFFSET.times(rot)
-				tracker = connection?.getTracker(packet.sensorId)
-				if (tracker == null) return
-				tracker.setRotation(rot)
-				if (packet is UDPPacket23RotationAndAcceleration) {
-					// Switch x and y around to adjust for different axes
-					tracker.setAcceleration(Vector3(packet.acceleration.y, packet.acceleration.x, packet.acceleration.z))
+				if (packet is UDPPacket300GeneratedMotionData) {
+					// Add new UDP packet definition to apply generated motion data to SteamVR.
+					// Set the received data to ComputedTracker transform distinguished by Sensor ID.
+					tracker = getComputedTracker(packet.sensorId)
+					if (tracker != null) {
+						tracker.received_rotation = packet.rotation
+						tracker.received_position = Vector3(packet.position.x, packet.position.y, packet.position.z)
+					} else {
+						return
+					}
+				} else {
+					tracker = connection?.getTracker(packet.sensorId)
+					if (tracker == null) return
+					tracker.setRotation(rot)
+					if (packet is UDPPacket23RotationAndAcceleration) {
+						// Switch x and y around to adjust for different axes
+						tracker.setAcceleration(Vector3(packet.acceleration.y, packet.acceleration.x, packet.acceleration.z))
+					}
 				}
 				tracker.dataTick()
 			}
@@ -406,6 +448,19 @@ class TrackersUDPServer(private val port: Int, name: String, private val tracker
 				when (packet.dataType) {
 					UDPPacket17RotationData.DATA_TYPE_NORMAL -> {
 						tracker.setRotation(rot17)
+						// Send packet to streaming server.
+						val outputStream: OutputStream = streaming_socket.getOutputStream()
+						val writer = PrintWriter(outputStream, true)
+						val data: Map<String, Any> = mapOf(
+							"\"device_name\"" to "\"sensor_${packet.sensorId}\"",
+							"\"ori\"" to "[${rot17.w}, ${rot17.x}, ${rot17.y}, ${rot17.z}]",
+						)
+						val size_buf = ByteBuffer.allocate(4)
+						size_buf.putInt(data.toString().length)
+						outputStream.write(size_buf.array())
+
+						val data_buf = data.toString().toByteArray()
+						outputStream.write(data_buf)
 						tracker.dataTick()
 						// tracker.calibrationStatus = rotationData.calibrationInfo;
 						// Not implemented in server
@@ -427,6 +482,20 @@ class TrackersUDPServer(private val port: Int, name: String, private val tracker
 				if (tracker == null) return
 				// Switch x and y around to adjust for different axes
 				tracker.setAcceleration(Vector3(packet.acceleration.y, packet.acceleration.x, packet.acceleration.z))
+				// Send received data to server.
+				val outputStream: OutputStream = streaming_socket.getOutputStream()
+				val writer = PrintWriter(outputStream, true)
+				val data: Map<String, Any> = mapOf(
+					"\"device_name\"" to "\"sensor_${packet.sensorId}\"",
+					"\"acc\"" to "[${packet.acceleration.x}, ${packet.acceleration.y}, ${packet.acceleration.z}]",
+				)
+				// Send size and data.
+				val size_buf = ByteBuffer.allocate(4)
+				size_buf.putInt(data.toString().length)
+				outputStream.write(size_buf.array())
+
+				val data_buf = data.toString().toByteArray()
+				outputStream.write(data_buf)
 			}
 
 			is UDPPacket10PingPong -> {

@@ -85,6 +85,8 @@ class Tracker @JvmOverloads constructor(
 	private var _rotation = Quaternion.IDENTITY
 	private var _acceleration = Vector3.NULL
 	var position = Vector3.NULL
+	var received_position = Vector3.NULL
+	var received_rotation = Quaternion.IDENTITY
 	val resetsHandler: TrackerResetsHandler = TrackerResetsHandler(this)
 	val filteringHandler: TrackerFilteringHandler = TrackerFilteringHandler()
 	val trackerFlexHandler: TrackerFlexHandler = TrackerFlexHandler(this)

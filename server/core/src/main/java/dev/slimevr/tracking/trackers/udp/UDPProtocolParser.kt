@@ -7,6 +7,7 @@ import java.nio.charset.StandardCharsets
 class UDPProtocolParser {
 	@Throws(IOException::class)
 	fun parse(buf: ByteBuffer, connection: UDPDevice?): Array<UDPPacket?> {
+		print(buf)
 		val packetId = buf.int
 		val packetNumber = buf.long
 		if (connection != null) {
@@ -117,6 +118,7 @@ class UDPProtocolParser {
 		PACKET_ACK_CONFIG_CHANGE -> UDPPacket24AckConfigChange()
 		PACKET_FLEX_DATA -> UDPPacket26FlexData()
 		PACKET_PROTOCOL_CHANGE -> UDPPacket200ProtocolChange()
+		PACKET_GENERATED_MOTION -> UDPPacket300GeneratedMotionData()
 		else -> null
 	}
 
@@ -155,6 +157,7 @@ class UDPProtocolParser {
 		const val PACKET_BUNDLE = 100
 		const val PACKET_BUNDLE_COMPACT = 101
 		const val PACKET_PROTOCOL_CHANGE = 200
+		const val PACKET_GENERATED_MOTION = 300
 		private val HANDSHAKE_BUFFER = ByteArray(64)
 		private val bundlePackets = ArrayList<UDPPacket>(128)
 
